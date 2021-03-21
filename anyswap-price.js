@@ -1,24 +1,150 @@
-const widget = new ListWidget()
+config.widgetFamily = config.widgetFamily || 'small'
 
-const anyStats = await fetchANYStats()
+// Text sizes
+const majorSizeData = 20
+const fontSizeData = 15
+const lineNumberData = 2
+const minimumScaleFactor = 1 // Value between 1.0 and 0.1
 
-await createWidget()
-
-// used for debugging if script runs inside the app
-if (!config.runsInWidget) {
-	await widget.presentSmall()
+// Number of data by Size
+const numberOfDisplayedDataBySize = {  
+  small: 1,
+  medium: 2,
+  large: 4
 }
 
-widget.setPadding(10, 10, 10, 10)
-widget.url = 'https://anyswap.exchange/dashboard'
+// Colors
+let backColor = new Color('D32D1F')
+let backColor2 = new Color('93291E')
+let textColor = new Color('EDEDED')
+let strokeColor = new Color('B0B0B0')
+let fillColor = new Color('EDEDED')
+let positiveColor = new Color('65C64C')
+let negativeColor = new Color('B74D34')
+let nodesColor = new Color('F7A437')
+let bridgesColor = new Color('0DB9DD')
+let tvlColor = new Color('65C64C')
+let strokeColorProgressbar = new Color('EDEDED')
+let fillColorProgressbar = new Color('B0B0B0')
 
-Script.setWidget(widget)
-Script.complete()
+if (true) {
+    backColor = Color.dynamic(backColor, new Color('111111'))
+    backColor2 = Color.dynamic(backColor2, new Color('222222'))
+    textColor = Color.dynamic(textColor, new Color('EDEDED'))
+    strokeColor = Color.dynamic(strokeColor, new Color('111111'))
+    fillColor = Color.dynamic(fillColor, new Color('EDEDED'))
+    strokeColorProgressbar = Color.dynamic(strokeColorProgressbar, new Color('EDEDED'))
+    fillColorProgressbar = Color.dynamic(fillColorProgressbar, new Color('111111'))
+}
 
-// build the content of the widget
-async function createWidget() {
+// Get coloring dependant on the percentage
+function signColouring(percentage) {
+	let colorCode = ''
+	if (percentage >= 0) { colorCode = positiveColor}
+	if (percentage < 0) { colorCode = negativeColor}
 
-	let line1, line2, line3
+	return colorCode
+}
+
+// fetches the anyswap stats
+async function fetchANYStats() {
+
+    let url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=anyswap'
+	const req = new Request(url);
+	const apiResult = await req.loadJSON();
+
+    let infoUrl = 'https://netapi.anyswap.net/bridge/v2/info'
+	const infoReq = new Request(infoUrl);
+	const infoResult = await infoReq.loadJSON();
+
+	let nodeUrl = 'https://netapi.anyswap.net/nodes/list'
+	const nodeReq = new Request(nodeUrl);
+	const nodeResult = await nodeReq.loadJSON();
+
+    
+
+    let result = {
+        ...apiResult[0],
+        ...infoResult,
+		...nodeResult
+    }
+
+    let percentageString = result.price_change_percentage_24h.toFixed(2);
+    let percentageSign = result.price_change_percentage_24h > 0 ? "+" : ""
+    let percentageColor = signColouring(percentageString)
+    let currentPrice = "$" + result.current_price.toString();
+    let marketCap = "$" + (result.market_cap / 1000000).toFixed(2) + "M";
+
+    data = [
+        {
+            title: "Nodes",
+            value: result.info.length.toFixed(),
+            titleColor: textColor,
+            valueColor: nodesColor
+        },
+        {
+            title: "Bridges",
+            value: result.bridgeNum.toFixed(),
+            titleColor: textColor,
+            valueColor: bridgesColor
+        },
+        {
+            title: "TVL",
+            value: "$" + (result.totalAmount / 1000000).toFixed(2) + "M",
+            titleColor: textColor,
+            valueColor: tvlColor
+        }
+    ]
+
+    Object.assign(result, {
+        percentageString,
+        percentageSign,
+        percentageColor,
+        currentPrice,
+        marketCap,
+        data
+    })
+
+	console.log(result);
+
+	return result;
+}
+
+// get images from local filestore or download them once
+async function getImage(image) {
+	let fm = FileManager.local()
+	let dir = fm.documentsDirectory()
+	let path = fm.joinPath(dir, image)
+	if (fm.fileExists(path)) {
+		return fm.readImage(path)
+	} else {
+		// download once
+		let imageUrl
+		switch (image) {
+			case 'bitcoin':
+				imageUrl = "https://assets.coingecko.com/coins/images/1/small/bitcoin.png?1547033579"
+				break
+            case 'anyswap':
+                imageUrl = "https://assets.coingecko.com/coins/images/12242/small/anyswap.jpg?1598443880"
+                break
+			default:
+				console.log(`Sorry, couldn't find ${image}.`);
+		}
+
+		let iconImage = await loadImage(imageUrl)
+		fm.writeImage(path, iconImage)
+		return iconImage
+	}
+}
+
+// helper function to download an image from a given url
+async function loadImage(imgUrl) {
+	const req = new Request(imgUrl)
+	return await req.loadImage()
+}
+
+async function prepareSmallWidget(widget, anyStats) {
+    let line1, line2, line3
 	let icon = widget.addStack()
 
 	const coin = await getImage('anyswap')
@@ -37,10 +163,8 @@ async function createWidget() {
 	line1.font = Font.mediumRoundedSystemFont(13)
 	// line1.leftAlignText()
 
-    let percentageString = anyStats.price_change_percentage_24h.toFixed(2);
-    let percentageSign = anyStats.price_change_percentage_24h > 0 ? "+" : ""
-	let line1nxt = iconRow.addText(percentageSign + percentageString + "%")
-    line1nxt.textColor = new Color('#'+signColouring(percentageString))
+	let line1nxt = iconRow.addText(anyStats.percentageSign + anyStats.percentageString + "%")
+    line1nxt.textColor = anyStats.percentageColor
 	line1nxt.font = Font.mediumRoundedSystemFont(13)
     line1nxt.rightAlignText()
 
@@ -53,8 +177,8 @@ async function createWidget() {
 	let row = widget.addStack()
 	row.layoutHorizontally()
 	
-	let currentPrice = row.addText("$" + anyStats.current_price.toString())
-	currentPrice.textColor = new Color('#'+signColouring(percentageString))
+	let currentPrice = row.addText(anyStats.currentPrice)
+	currentPrice.textColor = anyStats.percentageColor
 	currentPrice.font = Font.regularMonospacedSystemFont(18)
 
     let volRow = widget.addStack()
@@ -69,62 +193,186 @@ async function createWidget() {
 	let row2 = widget.addStack()
 	row2.layoutHorizontally()
 
-	let currentMarketCap = row2.addText("Market Cap: " + "$" + (anyStats.market_cap / 1000000).toFixed(2) + "M")
+	let currentMarketCap = row2.addText("Market Cap: " + anyStats.marketCap)
 	currentMarketCap.font = Font.lightRoundedSystemFont(11)
 }
 
-// Get coloring dependant on the percentage
-function signColouring(percentage) {
-	let colorCode = ''
-	if (percentage >= 0) { colorCode = '65c64c'}
-	if (percentage < 0) { colorCode = 'b74d34'}
+async function prepareMediumWidget(widget, anyStats) {
+    let firstLineStack = widget.addStack()
 
-	return colorCode
+    const coin = await getImage('anyswap')
+	const coinImg = firstLineStack.addImage(coin)
+	coinImg.imageSize = new Size(30, 30)
+	coinImg.cornerRadius = 15
+
+    firstLineStack.layoutHorizontally()
+	firstLineStack.addSpacer(8)
+
+	let providerRow = firstLineStack.addStack()
+	providerRow.layoutVertically()
+
+    let providerText = providerRow.addText("Anyswap 🚀")
+    providerText.font = Font.mediumSystemFont(majorSizeData)
+    providerText.textColor = textColor
+
+    widget.addSpacer()
+
+    // Price Info Row
+    const infoStack = widget.addStack()
+    infoStack.layoutHorizontally()
+
+    // ============= Price ============== //
+    let row
+    row = widget.addStack()
+    row.layoutHorizontally()
+    widget.addSpacer(5)
+
+    column = row.addStack()
+    column.layoutVertically()
+    column.centerAlignContent()
+
+    // Price
+    let priceValue;
+    priceValue = anyStats.currentPrice
+    textStack = column.addStack()
+    textStack.layoutHorizontally()
+    textStack.addSpacer()
+    let priceValueText = textStack.addText(priceValue)
+    priceValueText.font = Font.mediumSystemFont(majorSizeData)
+    priceValueText.minimumScaleFactor = minimumScaleFactor
+    priceValueText.lineLimit = lineNumberData
+    priceValueText.centerAlignText()
+    priceValueText.textColor = anyStats.percentageColor
+    textStack.addSpacer()
+
+    percentageValue = column.addStack()
+    percentageValue.layoutHorizontally()
+    percentageValue.addSpacer()
+    let percentageValueText = percentageValue.addText(anyStats.percentageSign + anyStats.percentageString + "%")
+    percentageValueText.font = Font.systemFont(fontSizeData)
+    percentageValueText.minimumScaleFactor = minimumScaleFactor
+    percentageValueText.lineLimit = 1
+    percentageValueText.centerAlignText()
+    percentageValueText.textColor = anyStats.percentageColor
+    percentageValue.addSpacer()
+
+    // ============= Market Cap ============== //
+    column = row.addStack()
+    column.layoutVertically()
+    column.centerAlignContent()
+
+    // Market Cap
+    let marketCapTitle;
+    marketCapTitle = "Market Cap"
+    textStack = column.addStack()
+    textStack.layoutHorizontally()
+    textStack.addSpacer()
+    let marketCapTitleText = textStack.addText(marketCapTitle)
+    marketCapTitleText.font = Font.mediumSystemFont(fontSizeData)
+    marketCapTitleText.minimumScaleFactor = minimumScaleFactor
+    marketCapTitleText.lineLimit = lineNumberData
+    marketCapTitleText.centerAlignText()
+    marketCapTitleText.textColor = textColor
+    textStack.addSpacer()
+
+    marketCapValue = column.addStack()
+    marketCapValue.layoutHorizontally()
+    marketCapValue.addSpacer()
+    let marketCapValueText = marketCapValue.addText(anyStats.marketCap)
+    marketCapValueText.font = Font.systemFont(fontSizeData - 1)
+    marketCapValueText.minimumScaleFactor = minimumScaleFactor
+    marketCapValueText.lineLimit = 1
+    marketCapValueText.centerAlignText()
+    marketCapValueText.textColor = positiveColor
+    marketCapValue.addSpacer()
+
+    widget.addSpacer()
+
+    // TVL Row
+    const stack = widget.addStack()
+    stack.layoutHorizontally()
+
+    let i = 0
+    let row2
+
+    anyStats.data.forEach((v) => {
+        if (++i % 3 == 1) {
+            row2 = widget.addStack()
+            row2.layoutHorizontally()
+            widget.addSpacer(5)
+        }
+        column = row2.addStack()
+        column.layoutVertically()
+        column.centerAlignContent()
+
+        // Total Values
+        let displayTitle;
+        displayTitle = v.title
+        textStack = column.addStack()
+        textStack.layoutHorizontally()
+        textStack.addSpacer()
+        let diagramText = textStack.addText(displayTitle)
+        diagramText.font = Font.mediumSystemFont(fontSizeData)
+        diagramText.minimumScaleFactor = minimumScaleFactor
+        diagramText.lineLimit = lineNumberData
+        diagramText.centerAlignText()
+        diagramText.textColor = v.titleColor
+        textStack.addSpacer()
+
+        displayValue = column.addStack()
+        displayValue.layoutHorizontally()
+        displayValue.addSpacer()
+        let diagramName = displayValue.addText(v.value)
+        diagramName.font = Font.systemFont(fontSizeData - 1)
+        diagramName.minimumScaleFactor = minimumScaleFactor
+        diagramName.lineLimit = 1
+        diagramName.centerAlignText()
+        diagramName.textColor = v.valueColor
+        displayValue.addSpacer()
+    })
 }
 
-// fetches the anyswap stats
-async function fetchANYStats() {
+// Create Widget
+let widget = new ListWidget()
+widget.url = 'https://anyswap.exchange/dashboard'
 
-    let url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=anyswap'
+const anyStats = await fetchANYStats()
 
-	const req = new Request(url);
-	const apiResult = await req.loadJSON();
-    
-	const stats = apiResult[0];
-	return stats;
+widget.setPadding(10, 10, 10, 10)
+
+if (anyStats != undefined) {
+
+    const gradient = new LinearGradient()
+    gradient.locations = [0, 1]
+    gradient.colors = [
+        backColor,
+        backColor2
+    ]
+    widget.backgroundGradient = gradient
+
+    switch (config.widgetFamily) {
+        case 'small': await prepareSmallWidget(widget, anyStats); break;
+        case 'medium': await prepareMediumWidget(widget, anyStats); break;
+        case 'large': await prepareMediumWidget(widget, anyStats); break;
+        default: await prepareSmallWidget(widget, anyStats); break;
+    }
+
+} else {
+    let fallbackText = widget.addText("Unexpected error.")
+    fallbackText.font = Font.mediumSystemFont(12)
+    fallbackText.textColor = textColor
 }
 
-// get images from local filestore or download them once
-async function getImage(image) {
-	let fm = FileManager.local()
-	let dir = fm.documentsDirectory()
-	let path = fm.joinPath(dir, image)
-	if (fm.fileExists(path)) {
-		return fm.readImage(path)
-	} else {
-		// download once
-		let imageUrl
-		switch (image) {
-			case 'bitcoin':
-				imageUrl = "/coins/images/1/small/bitcoin.png?1547033579"
-				break
-            case 'anyswap':
-                imageUrl = "/coins/images/12242/small/anyswap.jpg?1598443880"
-                break
-			default:
-				console.log(`Sorry, couldn't find ${image}.`);
-		}
+if (!config.runsInWidget) {
+    switch (config.widgetFamily) {
+        case 'small': await widget.presentSmall(); break;
+        case 'medium': await widget.presentMedium(); break;
+        case 'large': await widget.presentLarge(); break;
+        default: await widget.presentSmall(); break;
+    }
 
-		let iconImage = await loadImage('https://assets.coingecko.com'+imageUrl)
-		fm.writeImage(path, iconImage)
-		return iconImage
-	}
+} else {
+    // Tell the system to show the widget.
+    Script.setWidget(widget)
+    Script.complete()
 }
-
-// helper function to download an image from a given url
-async function loadImage(imgUrl) {
-	const req = new Request(imgUrl)
-	return await req.loadImage()
-}
-
-// end of script
