@@ -2,6 +2,8 @@
 
 <img src="assets/showcase.png" width="400">
 
+<img src="assets/showcase-medium.png" width="400">
+
 ### Download **Scriptable** app
 
 ## [![image](https://docs.scriptable.app/img/app-store-badge.svg)](https://itunes.apple.com/us/app/scriptable/id1405459188)

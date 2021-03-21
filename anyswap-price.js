@@ -14,27 +14,19 @@ const numberOfDisplayedDataBySize = {
 }
 
 // Colors
-let backColor = new Color('D32D1F')
-let backColor2 = new Color('93291E')
-let textColor = new Color('EDEDED')
-let strokeColor = new Color('B0B0B0')
-let fillColor = new Color('EDEDED')
+let backColor = new Color('FFFFFF')
+let backColor2 = new Color('EDEDED')
+let textColor = new Color('000000')
 let positiveColor = new Color('65C64C')
 let negativeColor = new Color('B74D34')
 let nodesColor = new Color('F7A437')
 let bridgesColor = new Color('0DB9DD')
 let tvlColor = new Color('65C64C')
-let strokeColorProgressbar = new Color('EDEDED')
-let fillColorProgressbar = new Color('B0B0B0')
 
 if (true) {
     backColor = Color.dynamic(backColor, new Color('111111'))
     backColor2 = Color.dynamic(backColor2, new Color('222222'))
     textColor = Color.dynamic(textColor, new Color('EDEDED'))
-    strokeColor = Color.dynamic(strokeColor, new Color('111111'))
-    fillColor = Color.dynamic(fillColor, new Color('EDEDED'))
-    strokeColorProgressbar = Color.dynamic(strokeColorProgressbar, new Color('EDEDED'))
-    fillColorProgressbar = Color.dynamic(fillColorProgressbar, new Color('111111'))
 }
 
 // Get coloring dependant on the percentage
