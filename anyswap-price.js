@@ -75,13 +75,13 @@ async function fetchANYStats() {
             valueColor: nodesColor
         },
         {
-            title: "Bridges",
+            title: "Tokens",
             value: result.bridgeNum.toFixed(),
             titleColor: textColor,
             valueColor: bridgesColor
         },
         {
-            title: "TVL",
+            title: "AUM",
             value: "$" + (result.totalAmount / 1000000).toFixed(2) + "M",
             titleColor: textColor,
             valueColor: tvlColor
